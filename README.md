@@ -38,7 +38,7 @@ A [MagicMirror²](https://magicmirror.builders/) module that generates a new AI 
 
 ```bash
 cd ~/MagicMirror/modules
-git clone https://github.com/YOUR_USERNAME/MMM-AIWallpaper.git
+git clone https://github.com/AJOCHAM/MMM-AIWallpaper.git
 cd MMM-AIWallpaper
 ```
 
