@@ -3,8 +3,8 @@ Module.register("MMM-AIWallpaper", {
     updateInterval: 60 * 60 * 1000,
     weatherApiKey: "DEIN_OPENWEATHERMAP_KEY",
     city: "Berlin",
-    width: 1920,
-    height: 1080,
+    width: 1080,
+    height: 1920,
     model: "flux",
     enhance: true,
     style: "photorealistic landscape, ultra detailed, 8k",
@@ -57,6 +57,11 @@ Module.register("MMM-AIWallpaper", {
     if (notification === "DOWNLOAD_ERROR") {
       this.status = `Download error: ${payload.error}`;
       this.debugInfo.error = payload.error;
+      this.debugInfo.usingCached = payload.usingCached;
+      // Show the fallback path instead of nothing
+      if (payload.fallbackPath) {
+        this.localPath = payload.fallbackPath;
+      }
       console.error("[MMM-AIWallpaper] Download error:", payload.error);
       this.updateDom();
     }
@@ -75,10 +80,10 @@ Module.register("MMM-AIWallpaper", {
   getDaytime() {
     const h = new Date().getHours();
     if (h >= 5  && h < 9)  return "golden hour sunrise, dawn";
-    if (h >= 9  && h < 12) return "bright morning, clear daylight";
-    if (h >= 12 && h < 17) return "midday, full sunlight";
-    if (h >= 17 && h < 20) return "sunset, golden hour, warm orange sky";
-    if (h >= 20 && h < 23) return "dusk, twilight, blue hour";
+    if (h >= 9  && h < 12) return "bright morning";
+    if (h >= 12 && h < 17) return "midday";
+    if (h >= 17 && h < 20) return "sunset, golden hour";
+    if (h >= 20 && h < 21) return "dusk, twilight, blue hour";
     return "night, stars, moonlight";
   },
 
@@ -110,7 +115,7 @@ Module.register("MMM-AIWallpaper", {
       const month    = new Date().getMonth() + 1;
       const monthMod = this.config.monthModifiers[month];
       const daytime  = this.getDaytime();
-      const promptRaw = `${daytime}, ${weather} weather, ${monthMod}, ${this.config.style}`;
+      const promptRaw = `Main subject is the weather: ${weather}. Time of day: ${daytime}. Image style must be: ${this.config.style}, Secondary mood and seasonal context: ${monthMod}. The environment may be historical or futuristic, but it must support the weather and style and stay secondary.`;
       const prompt   = encodeURIComponent(promptRaw);
       const seed     = Math.floor(Math.random() * 2147483647);
 
