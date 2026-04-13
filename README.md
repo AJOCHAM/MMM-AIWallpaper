@@ -179,4 +179,4 @@ MMM-AIWallpaper/
 
 ## License
 
-MIT
+APACHE 2
