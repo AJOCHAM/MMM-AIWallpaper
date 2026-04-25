@@ -5,25 +5,37 @@ Module.register("MMM-AIWallpaper", {
     city: "Berlin",
     width: 1080,
     height: 1920,
-    model: "flux",
+    mediaType: "video",
+    imagemodel: "flux",
+    videomodel: "nova-reel",
     enhance: true,
-    style: "photorealistic landscape, ultra detailed, 8k",
     pollinationsKey: "pk_DEIN_KEY_HIER",
     debug: false,
+    videoDuration: 5,
+    videoAspectRatio: "9:16",
+    videoAudio: false,
+    muteVideo: true,
+    loopVideo: true,
+    styles: [
+      "impressionist painting, oil on canvas, artistic, moody, expressive brushstrokes",
+      "Comic style, atmospheric, science fiction elements, modern european",
+      "anime background art, studio ghibli style, detailed, beautiful",
+      "photorealistic landscape, ultra detailed, 8k"
+    ],
     monthModifiers: {
-      1:  "snowy winter, frozen trees, icy",
-      2:  "late winter, bare trees, cold light",
-      3:  "early spring, first flowers, fresh",
-      4:  "spring, cherry blossoms, green meadows",
-      5:  "late spring, colorful flowers, warm sun",
-      6:  "early summer, lush green, golden light",
-      7:  "midsummer, hot haze, vibrant colors",
-      8:  "late summer, sunflowers, harvest beginning",
-      9:  "early autumn, golden leaves, misty mornings",
+      1: "snowy winter, frozen trees, icy",
+      2: "late winter, bare trees, cold light",
+      3: "early spring, first flowers, fresh",
+      4: "spring, cherry blossoms, green meadows",
+      5: "late spring, colorful flowers, warm sun",
+      6: "early summer, lush green, golden light",
+      7: "midsummer, hot haze, vibrant colors",
+      8: "late summer, sunflowers, harvest beginning",
+      9: "early autumn, golden leaves, misty mornings",
       10: "autumn, red and orange foliage, fog",
       11: "late autumn, bare trees, grey skies",
-      12: "winter, christmas lights, snow",
-    },
+      12: "winter, christmas lights, snow"
+    }
   },
 
   getStyles() {
@@ -31,15 +43,15 @@ Module.register("MMM-AIWallpaper", {
   },
 
   start() {
-    this.imageUrl = null;      // remote URL (for debug display)
-    this.localPath = null;     // local file path served by MM
+    this.imageUrl = null;
+    this.videoUrl = null;
+    this.localPath = null;
+    this.localMediaType = this.config.mediaType || "image";
     this.debugInfo = {};
     this.lastUpdated = null;
     this.status = "Initializing...";
 
     this.log("Module started. Debug mode ON.");
-
-    // Listen for messages from node_helper
     this.sendSocketNotification("INIT", {});
 
     this.generateWallpaper();
@@ -47,10 +59,11 @@ Module.register("MMM-AIWallpaper", {
   },
 
   socketNotificationReceived(notification, payload) {
-    if (notification === "IMAGE_READY") {
+    if (notification === "MEDIA_READY") {
       this.localPath = payload.localPath;
+      this.localMediaType = payload.mediaType || this.config.mediaType || "image";
       this.status = "OK";
-      this.log("Local image ready:", payload.localPath);
+      this.log("Local media ready:", payload);
       this.updateDom();
     }
 
@@ -58,9 +71,9 @@ Module.register("MMM-AIWallpaper", {
       this.status = `Download error: ${payload.error}`;
       this.debugInfo.error = payload.error;
       this.debugInfo.usingCached = payload.usingCached;
-      // Show the fallback path instead of nothing
       if (payload.fallbackPath) {
         this.localPath = payload.fallbackPath;
+        this.localMediaType = payload.mediaType || this.localMediaType || this.config.mediaType || "image";
       }
       console.error("[MMM-AIWallpaper] Download error:", payload.error);
       this.updateDom();
@@ -79,8 +92,8 @@ Module.register("MMM-AIWallpaper", {
 
   getDaytime() {
     const h = new Date().getHours();
-    if (h >= 5  && h < 9)  return "golden hour sunrise, dawn";
-    if (h >= 9  && h < 12) return "bright morning";
+    if (h >= 5 && h < 9) return "golden hour sunrise, dawn";
+    if (h >= 9 && h < 12) return "bright morning";
     if (h >= 12 && h < 17) return "midday";
     if (h >= 17 && h < 20) return "sunset, golden hour";
     if (h >= 20 && h < 21) return "dusk, twilight, blue hour";
@@ -93,7 +106,6 @@ Module.register("MMM-AIWallpaper", {
     this.log("Starting wallpaper generation cycle.");
 
     try {
-      // --- Step 1: Weather ---
       const weatherUrl = `https://api.openweathermap.org/data/2.5/weather`
         + `?q=${this.config.city}`
         + `&appid=${this.config.weatherApiKey}`
@@ -104,60 +116,77 @@ Module.register("MMM-AIWallpaper", {
       if (!res.ok) throw new Error(`Weather API error: ${res.status} ${res.statusText}`);
       const data = await res.json();
 
-      const weather  = data.weather[0].description;
-      const temp     = data.main.temp;
+      const weather = data.weather[0].description;
+      const temp = data.main.temp;
       const humidity = data.main.humidity;
-      const city     = data.name;
+      const city = data.name;
 
       this.log("Weather data received:", { weather, temp, humidity, city });
 
-      // --- Step 2: Build prompt ---
-      const month    = new Date().getMonth() + 1;
+      const month = new Date().getMonth() + 1;
       const monthMod = this.config.monthModifiers[month];
-      const daytime  = this.getDaytime();
-      const promptRaw = `Main subject is the weather: ${weather}. Time of day: ${daytime}. Image style must be: ${this.config.style}, Secondary mood and seasonal context: ${monthMod}. The environment may be historical or futuristic, but it must support the weather and style and stay secondary.`;
-      const prompt   = encodeURIComponent(promptRaw);
-      const seed     = Math.floor(Math.random() * 2147483647);
+      const randomstyle = this.config.styles[Math.floor(Math.random() * this.config.styles.length)];
+      const daytime = this.getDaytime();
+      const promptRaw = `Main subject is the weather: ${weather}. Time of day: ${daytime}. Image style must be: ${randomstyle}, Secondary mood and seasonal context: ${monthMod}. The environment may be historical or futuristic, but it must support the weather and style and stay secondary.`;
+      const prompt = encodeURIComponent(promptRaw);
+      const seed = Math.floor(Math.random() * 2147483647);
+      const isVideo = this.config.mediaType === "video";
 
       this.log("Full prompt (raw):", promptRaw);
 
-      // --- Step 3: Build image URL ---
-      const imgUrl = `https://gen.pollinations.ai/image/${prompt}`
-        + `?width=${this.config.width}`
-        + `&height=${this.config.height}`
-        + `&model=${this.config.model}`
-        + `&enhance=${this.config.enhance}`
-        + `&nologo=true`
-        + `&seed=${seed}`
-        + `&key=${this.config.pollinationsKey}`;
 
-      this.imageUrl = imgUrl;
-      this.status   = "Downloading image...";
+      let mediaUrl = "";
+
+      if (isVideo) {
+        mediaUrl = `https://gen.pollinations.ai/video/${prompt}`
+          + `?model=${encodeURIComponent(this.config.videomodel)}`
+          + `&enhance=${this.config.enhance}`
+          + `&nologo=true`
+          + `&seed=${seed}`
+          + `&key=${encodeURIComponent(this.config.pollinationsKey)}`;
+          + `&duration=${encodeURIComponent(this.config.videoDuration)}`;
+          + `&aspectRatio=${encodeURIComponent(this.config.videoAspectRatio)}`;
+          + `&audio=${encodeURIComponent(this.config.videoAudio)}`;
+      } else {
+        mediaUrl = `https://gen.pollinations.ai/image/${prompt}`
+          + `?model=${encodeURIComponent(this.config.imagemodel)}`
+          + `&enhance=${this.config.enhance}`
+          + `&nologo=true`
+          + `&seed=${seed}`
+          + `&key=${encodeURIComponent(this.config.pollinationsKey)}`;
+          + `&width=${this.config.width}`;
+          + `&height=${this.config.height}`;
+      }
+
+      this.imageUrl = isVideo ? null : mediaUrl;
+      this.videoUrl = isVideo ? mediaUrl : null;
+      this.status = isVideo ? "Downloading video..." : "Downloading image...";
 
       this.debugInfo = {
         city,
         weather,
-        temp:        `${temp}°C`,
-        humidity:    `${humidity}%`,
+        temp: `${temp}°C`,
+        humidity: `${humidity}%`,
         daytime,
         month,
         monthMod,
-        prompt:      promptRaw,
-        model:       this.config.model,
+        prompt: promptRaw,
+        imagemodel: this.config.imagemodel,
+        videomodel: this.config.videomodel,
+        mediaType: this.config.mediaType,
         seed,
-        imageUrl:    imgUrl,
-        lastUpdated: new Date().toLocaleTimeString(),
+        mediaUrl,
+        lastUpdated: new Date().toLocaleTimeString()
       };
 
       this.updateDom();
-      this.log("Sending download request to node_helper.", imgUrl);
+      this.log("Sending download request to node_helper.", mediaUrl);
 
-      // --- Step 4: Hand off download to node_helper ---
-      this.sendSocketNotification("DOWNLOAD_IMAGE", {
-        imageUrl: imgUrl,
-        debug: this.config.debug,
+      this.sendSocketNotification("DOWNLOAD_MEDIA", {
+        mediaUrl,
+        mediaType: this.config.mediaType,
+        debug: this.config.debug
       });
-
     } catch (e) {
       this.status = `ERROR: ${e.message}`;
       this.debugInfo.error = e.message;
@@ -168,37 +197,48 @@ Module.register("MMM-AIWallpaper", {
 
   getDom() {
     const wrapper = document.createElement("div");
-
-    // Background — use local file once available, else nothing
     const bg = document.createElement("div");
     bg.className = "wallpaper-container";
 
     if (this.localPath) {
+      if (this.localMediaType === "video") {
+        const video = document.createElement("video");
+        video.className = "wallpaper-video";
+        video.autoplay = true;
+        video.muted = this.config.muteVideo !== false;
+        video.loop = this.config.loopVideo !== false;
+        video.playsInline = true;
+        video.src = this.localPath;
+        bg.appendChild(video);
+      } else {
         bg.style.setProperty("background-image", "url('" + this.localPath + "')");
+      }
     }
+
     wrapper.appendChild(bg);
 
-    // Debug overlay
     if (this.config.debug) {
       const overlay = document.createElement("div");
       overlay.className = "wallpaper-debug-overlay";
-      const info    = this.debugInfo;
+      const info = this.debugInfo;
       const isError = this.status.startsWith("ERROR") || this.status.startsWith("Download error");
 
       const rows = [
-        ["Status",      this.status],
-        ["Local file",  this.localPath  || "—"],
-        ["City",        info.city       || "—"],
-        ["Weather",     info.weather    || "—"],
-        ["Temperature", info.temp       || "—"],
-        ["Humidity",    info.humidity   || "—"],
-        ["Daytime",     info.daytime    || "—"],
-        ["Month",       info.month      || "—"],
-        ["MonthMod",    info.monthMod   || "—"],
-        ["Model",       info.model      || "—"],
-        ["Seed",        info.seed       || "—"],
-        ["Updated",     info.lastUpdated|| "—"],
-        ["Prompt",      info.prompt     || "—"],
+        ["Status", this.status],
+        ["Media type", this.localMediaType || info.mediaType || "—"],
+        ["Local file", this.localPath || "—"],
+        ["City", info.city || "—"],
+        ["Weather", info.weather || "—"],
+        ["Temperature", info.temp || "—"],
+        ["Humidity", info.humidity || "—"],
+        ["Daytime", info.daytime || "—"],
+        ["Month", info.month || "—"],
+        ["MonthMod", info.monthMod || "—"],
+        ["ImageModel", info.imagemodel || "—"],
+        ["VideoModel", info.videomodel || "—"],
+        ["Seed", info.seed || "—"],
+        ["Updated", info.lastUpdated || "—"],
+        ["Prompt", info.prompt || "—"]
       ];
 
       if (info.error) rows.push(["Error", info.error]);
@@ -218,5 +258,5 @@ Module.register("MMM-AIWallpaper", {
     }
 
     return wrapper;
-  },
+  }
 });

@@ -1,131 +1,148 @@
 const NodeHelper = require("node_helper");
-const https      = require("https");
-const http       = require("http");
-const fs         = require("fs");
-const path       = require("path");
-const url        = require("url");
+const https = require("https");
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
 module.exports = NodeHelper.create({
-
   start() {
-    this.imagePath   = path.join(__dirname, "current_wallpaper.jpg");
-    this.tmpPath     = path.join(__dirname, "current_wallpaper.jpg.tmp");
-    this.defaultPath = path.join(__dirname, "default_wallpaper.jpg");
+    this.mediaFiles = {
+      image: {
+        currentPath: path.join(__dirname, "current_wallpaper.jpg"),
+        tmpPath: path.join(__dirname, "current_wallpaper.jpg.tmp"),
+        defaultPath: path.join(__dirname, "default_wallpaper.jpg"),
+        publicPath: "/modules/MMM-AIWallpaper/current_wallpaper.jpg",
+        defaultPublicPath: "/modules/MMM-AIWallpaper/default_wallpaper.jpg"
+      },
+      video: {
+        currentPath: path.join(__dirname, "current_wallpaper.mp4"),
+        tmpPath: path.join(__dirname, "current_wallpaper.mp4.tmp"),
+        defaultPath: path.join(__dirname, "default_wallpaper.mp4"),
+        publicPath: "/modules/MMM-AIWallpaper/current_wallpaper.mp4",
+        defaultPublicPath: "/modules/MMM-AIWallpaper/default_wallpaper.mp4"
+      }
+    };
+
     console.log("[MMM-AIWallpaper] node_helper started.");
-    console.log("[MMM-AIWallpaper] Image path:   ", this.imagePath);
-    console.log("[MMM-AIWallpaper] Default path: ", this.defaultPath);
+    console.log("[MMM-AIWallpaper] Image path:", this.mediaFiles.image.currentPath);
+    console.log("[MMM-AIWallpaper] Video path:", this.mediaFiles.video.currentPath);
   },
 
   socketNotificationReceived(notification, payload) {
     console.log("[MMM-AIWallpaper] node_helper received:", notification);
-    if (notification === "DOWNLOAD_IMAGE") {
-      this.downloadImage(payload.imageUrl, payload.debug, 0);
+
+    if (notification === "DOWNLOAD_MEDIA") {
+      const mediaType = payload.mediaType === "video" ? "video" : "image";
+      this.downloadMedia(payload.mediaUrl, mediaType, payload.debug, 0);
     }
   },
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
-
-  localImageExists() {
-    return fs.existsSync(this.imagePath);
+  localMediaExists(mediaType) {
+    return fs.existsSync(this.mediaFiles[mediaType].currentPath);
   },
 
-  sendFallback(reason) {
-    const usingCurrent = this.localImageExists();
-    const fallbackPath = usingCurrent
-      ? `/modules/MMM-AIWallpaper/current_wallpaper.jpg?t=${Date.now()}`
-      : `/modules/MMM-AIWallpaper/default_wallpaper.jpg`;
+  buildPublicPath(mediaType, useCurrent) {
+    const fileConfig = this.mediaFiles[mediaType];
+    if (useCurrent) {
+      return `${fileConfig.publicPath}?t=${Date.now()}`;
+    }
+    return fileConfig.defaultPublicPath;
+  },
 
-    console.warn(`[MMM-AIWallpaper] Falling back to ${usingCurrent ? "last cached" : "default"} wallpaper. Reason: ${reason}`);
+  sendFallback(reason, mediaType) {
+    const usingCurrent = this.localMediaExists(mediaType);
+    const fallbackPath = this.buildPublicPath(mediaType, usingCurrent);
+
+    console.warn(`[MMM-AIWallpaper] Falling back to ${usingCurrent ? "last cached" : "default"} ${mediaType}. Reason: ${reason}`);
 
     this.sendSocketNotification("DOWNLOAD_ERROR", {
-      error:        reason,
-      fallbackPath: fallbackPath,
-      usingCached:  usingCurrent,
+      error: reason,
+      fallbackPath,
+      usingCached: usingCurrent,
+      mediaType
     });
   },
 
-  // ── Download (with redirect following) ───────────────────────────────────
-
-  downloadImage(imageUrl, debug, redirectCount) {
+  downloadMedia(mediaUrl, mediaType, debug, redirectCount) {
     const MAX_REDIRECTS = 5;
+    const fileConfig = this.mediaFiles[mediaType];
 
     if (redirectCount > MAX_REDIRECTS) {
-      this.sendFallback(`Too many redirects (> ${MAX_REDIRECTS})`);
+      this.sendFallback(`Too many redirects (> ${MAX_REDIRECTS})`, mediaType);
       return;
     }
 
-    console.log(`[MMM-AIWallpaper] Downloading (redirect #${redirectCount}):`, imageUrl);
+    console.log(`[MMM-AIWallpaper] Downloading ${mediaType} (redirect #${redirectCount}):`, mediaUrl);
 
     let parsedUrl;
     try {
-      parsedUrl = new URL(imageUrl);
+      parsedUrl = new URL(mediaUrl);
     } catch (e) {
-      this.sendFallback(`Invalid URL: ${imageUrl}`);
+      this.sendFallback(`Invalid URL: ${mediaUrl}`, mediaType);
       return;
     }
 
     const protocol = parsedUrl.protocol === "https:" ? https : http;
-    const file     = fs.createWriteStream(this.tmpPath);
-    let   settled  = false;
+    const file = fs.createWriteStream(fileConfig.tmpPath);
+    let settled = false;
 
     const fail = (reason) => {
       if (settled) return;
       settled = true;
       file.close(() => {
-        fs.unlink(this.tmpPath, () => {});
+        fs.unlink(fileConfig.tmpPath, () => {});
       });
-      this.sendFallback(String(reason));
+      this.sendFallback(String(reason), mediaType);
     };
 
-    const request = protocol.get(imageUrl, (response) => {
-
-      // ── Redirects ──
+    const request = protocol.get(mediaUrl, (response) => {
       if ([301, 302, 307, 308].includes(response.statusCode)) {
         settled = true;
-        file.close(() => fs.unlink(this.tmpPath, () => {}));
+        file.close(() => fs.unlink(fileConfig.tmpPath, () => {}));
         const location = response.headers.location;
         if (!location) {
-          this.sendFallback("Redirect with no Location header");
+          this.sendFallback("Redirect with no Location header", mediaType);
           return;
         }
+
         console.log("[MMM-AIWallpaper] Redirect →", location);
-        this.downloadImage(location, debug, redirectCount + 1);
+        this.downloadMedia(location, mediaType, debug, redirectCount + 1);
         return;
       }
 
-      // ── Auth / rate limit ──
       if (response.statusCode === 401) {
         fail("Unauthorized (401) — check your Pollinations API key");
         return;
       }
+
       if (response.statusCode === 429) {
         fail("Rate limit exceeded (429) — will retry next hour");
         return;
       }
 
-      // ── Any other non-200 ──
       if (response.statusCode !== 200) {
         fail(`HTTP ${response.statusCode} ${response.statusMessage}`);
         return;
       }
 
-      // ── Stream to tmp file ──
       response.pipe(file);
 
       file.on("finish", () => {
         if (settled) return;
         file.close(() => {
-          fs.rename(this.tmpPath, this.imagePath, (renameErr) => {
+          fs.rename(fileConfig.tmpPath, fileConfig.currentPath, (renameErr) => {
             if (renameErr) {
-              fail(`Failed to save image: ${renameErr.message}`);
+              fail(`Failed to save ${mediaType}: ${renameErr.message}`);
               return;
             }
-            settled = true;
-            const size = (fs.statSync(this.imagePath).size / 1024).toFixed(1);
-            console.log(`[MMM-AIWallpaper] Image saved successfully (${size} KB):`, this.imagePath);
 
-            this.sendSocketNotification("IMAGE_READY", {
-              localPath: `/modules/MMM-AIWallpaper/current_wallpaper.jpg?t=${Date.now()}`,
+            settled = true;
+            const size = (fs.statSync(fileConfig.currentPath).size / 1024).toFixed(1);
+            console.log(`[MMM-AIWallpaper] ${mediaType} saved successfully (${size} KB):`, fileConfig.currentPath);
+
+            this.sendSocketNotification("MEDIA_READY", {
+              localPath: this.buildPublicPath(mediaType, true),
+              mediaType
             });
           });
         });
@@ -134,16 +151,13 @@ module.exports = NodeHelper.create({
       file.on("error", fail);
     });
 
-    // ── Network error ──
     request.on("error", (err) => {
       fail(`Network error: ${err.message}`);
     });
 
-    // ── Timeout ──
     request.setTimeout(30000, () => {
       request.destroy();
       fail("Download timed out after 30s");
     });
-  },
-
+  }
 });
