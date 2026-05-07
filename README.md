@@ -116,10 +116,51 @@ Each generation cycle picks one style at random from the `styles` array. You can
 
 ```javascript
 styles: [
-  "impressionist painting, oil on canvas, artistic, moody, expressive brushstrokes",
-  "Comic style, atmospheric, science fiction elements, modern european",
-  "anime background art, studio ghibli style, detailed, beautiful",
-  "photorealistic landscape, ultra detailed, 8k"
+  // Impressionism / painterly
+  "Impressionist painting, oil on canvas, luminous light, expressive brushstrokes, Claude Monet inspired",
+  "Post-impressionist landscape, bold color, textured paint, Vincent van Gogh inspired",
+  "Romantic landscape painting, dramatic skies, glowing light, Caspar David Friedrich inspired",
+
+  // Classical / historic
+  "Renaissance landscape, balanced composition, soft natural light, Leonardo da Vinci inspired",
+  "Baroque painting, rich shadows, dramatic contrast, golden highlights, Caravaggio inspired",
+  "Rococo pastoral scene, elegant, airy, delicate color palette, Jean-Honore Fragonard inspired",
+  "Ukiyo-e woodblock print, stylized clouds, flowing lines, Hokusai inspired",
+  "Japanese ink wash painting, minimal brushwork, tranquil atmosphere, sumi-e style",
+  "Chinese shan shui landscape, misty mountains, poetic, traditional ink painting",
+
+  // 19th / early 20th century
+  "Art Nouveau illustration, ornate organic lines, decorative floral forms, Alphonse Mucha inspired",
+  "Symbolist dreamscape, mysterious atmosphere, ethereal light, Odilon Redon inspired",
+  "Fauvist landscape, vivid unnatural color, bold shapes, Henri Matisse inspired",
+  "Cubist cityscape, fragmented geometry, layered planes, Pablo Picasso inspired",
+  "Expressionist painting, emotional color, energetic strokes, Wassily Kandinsky inspired",
+  "Surrealist landscape, strange dream logic, cinematic stillness, Salvador Dali inspired",
+
+  // Modern / graphic
+  "Bauhaus poster style, geometric forms, minimal palette, clean modernist composition",
+  "Art Deco illustration, elegant symmetry, luxurious metallic accents, 1920s style",
+  "Mid-century modern illustration, flat shapes, limited palette, retro design",
+  "Pop art scene, bold outlines, vibrant contrast, Roy Lichtenstein inspired",
+  "Minimalist Scandinavian landscape, muted tones, clean composition, calm atmosphere",
+  "Swiss graphic design style, strong layout, minimal forms, refined modern poster aesthetic",
+
+  // Contemporary / digital
+  "Comic style, atmospheric, science fiction elements, modern european graphic novel",
+  "Anime background art, painterly skies, detailed environment, Studio Ghibli inspired",
+  "Makoto Shinkai inspired background art, glowing skies, cinematic clouds, vibrant light",
+  "Photorealistic landscape, ultra detailed, natural lighting, cinematic 8k",
+  "Hyperreal matte painting, epic scenery, cinematic atmosphere, ultra detailed",
+  "Low poly landscape art, geometric shapes, stylized lighting, modern digital art",
+  "Watercolor illustration, soft washes, textured paper, gentle natural palette",
+  "Gouache painting, matte texture, rich color blocks, editorial illustration style",
+  "Pastel chalk landscape, soft edges, dreamy atmosphere, textured surface",
+  "Paper cut collage, layered shapes, handcrafted depth, elegant composition",
+  "Pixel art landscape, detailed retro scene, atmospheric lighting, 16-bit inspired",
+  "Synthwave retrofuturism, neon sunset, geometric horizon, 1980s inspired",
+  "Vaporwave dreamscape, pastel neon palette, surreal architecture, nostalgic digital mood",
+  "Dark fantasy illustration, moody atmosphere, intricate environment, cinematic detail",
+  "Nordic folklore illustration, muted winter palette, mysterious forest, storybook style"
 ],
 ```
 
