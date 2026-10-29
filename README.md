@@ -32,7 +32,8 @@ A [MagicMirror²](https://magicmirror.builders/) module that generates a new AI 
 
 - MagicMirror² installed and running
 - A free [OpenWeatherMap API key](https://openweathermap.org/api) (free tier: 1,000 calls/day)
-- A free [Pollinations.ai publishable key](https://enter.pollinations.ai) (`pk_...`)
+- For `mediaType: "image"`: nothing else — Flux image generation runs through the free, unauthenticated `image.pollinations.ai` endpoint, no key required
+- For `mediaType: "video"`: a [Pollinations.ai publishable key](https://enter.pollinations.ai) (`pk_...`), which is metered/paid
 
 ---
 
@@ -90,11 +91,11 @@ Add to your `~/MagicMirror/config/config.js`:
 | Option | Default | Description |
 |---|---|---|
 | `weatherApiKey` | `""` | OpenWeatherMap API key (required) |
-| `pollinationsKey` | `""` | Pollinations.ai publishable key `pk_...` (required) |
+| `pollinationsKey` | `""` | Pollinations.ai publishable key `pk_...` (only needed for `mediaType: "video"`; not used for images) |
 | `city` | `"Berlin"` | City for weather lookup |
 | `mediaType` | `"video"` | Output type: `"image"` or `"video"` |
-| `width` | `1080` | Image width in pixels (image mode only) |
-| `height` | `1920` | Image height in pixels (image mode only) |
+| `width` | `1080` | Fallback image width in pixels, only used if the browser window size can't be read. In image mode, the module normally detects your actual screen's `window.innerWidth`/`innerHeight` and requests an image in that exact aspect ratio (scaled down so the long edge stays within the free tier's ~1024px ceiling), so the generated image matches your display's proportions and `background-size: cover` doesn't need to crop it. |
+| `height` | `1920` | Fallback image height in pixels — see `width`. |
 | `imagemodel` | `"flux"` | Pollinations image model (e.g. `flux`, `turbo`) |
 | `videomodel` | `"nova-reel"` | Pollinations video model |
 | `videoDuration` | `5` | Video duration in seconds |
@@ -102,6 +103,7 @@ Add to your `~/MagicMirror/config/config.js`:
 | `videoAudio` | `false` | Include audio in generated video |
 | `muteVideo` | `true` | Mute video playback in the browser |
 | `loopVideo` | `true` | Loop video playback |
+| `blur` | `0` | CSS blur radius in px applied to the wallpaper (image or video). Softens visible upscaling artifacts from the free tier's ~1024px resolution cap. `0` disables it. |
 | `enhance` | `true` | Let Pollinations auto-enhance the prompt |
 | `styles` | *(see below)* | Array of styles; one is picked at random each cycle |
 | `updateInterval` | `3600000` | Refresh interval in ms (default: 1 hour) |

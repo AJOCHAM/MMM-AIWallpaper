@@ -16,6 +16,7 @@ Module.register("MMM-AIWallpaper", {
     videoAudio: false,
     muteVideo: true,
     loopVideo: true,
+    blur: 0,
     styles: [
       "impressionist painting, oil on canvas, artistic, moody, expressive brushstrokes",
       "Comic style, atmospheric, science fiction elements, modern european",
@@ -90,6 +91,25 @@ Module.register("MMM-AIWallpaper", {
     }
   },
 
+  getRequestDimensions() {
+    const FREE_TIER_MAX_EDGE = 1024;
+    const screenW = window.innerWidth || this.config.width;
+    const screenH = window.innerHeight || this.config.height;
+    const ratio = screenW / screenH;
+
+    let width;
+    let height;
+    if (screenW >= screenH) {
+      width = Math.min(screenW, FREE_TIER_MAX_EDGE);
+      height = Math.round(width / ratio);
+    } else {
+      height = Math.min(screenH, FREE_TIER_MAX_EDGE);
+      width = Math.round(height * ratio);
+    }
+
+    return { width, height };
+  },
+
   getDaytime() {
     const h = new Date().getHours();
     if (h >= 5 && h < 9) return "golden hour sunrise, dawn";
@@ -131,8 +151,10 @@ Module.register("MMM-AIWallpaper", {
       const prompt = encodeURIComponent(promptRaw);
       const seed = Math.floor(Math.random() * 2147483647);
       const isVideo = this.config.mediaType === "video";
+      const { width, height } = this.getRequestDimensions();
 
       this.log("Full prompt (raw):", promptRaw);
+      this.log("Requesting image sized to match screen (avoids cropping):", { width, height });
 
 
       let mediaUrl = "";
@@ -143,19 +165,19 @@ Module.register("MMM-AIWallpaper", {
           + `&enhance=${this.config.enhance}`
           + `&nologo=true`
           + `&seed=${seed}`
-          + `&key=${encodeURIComponent(this.config.pollinationsKey)}`;
-          + `&duration=${encodeURIComponent(this.config.videoDuration)}`;
-          + `&aspectRatio=${encodeURIComponent(this.config.videoAspectRatio)}`;
+          + `&key=${encodeURIComponent(this.config.pollinationsKey)}`
+          + `&duration=${encodeURIComponent(this.config.videoDuration)}`
+          + `&aspectRatio=${encodeURIComponent(this.config.videoAspectRatio)}`
           + `&audio=${encodeURIComponent(this.config.videoAudio)}`;
       } else {
-        mediaUrl = `https://gen.pollinations.ai/image/${prompt}`
+        // Free, unauthenticated Flux image generation (no pollinationsKey needed).
+        mediaUrl = `https://image.pollinations.ai/prompt/${prompt}`
           + `?model=${encodeURIComponent(this.config.imagemodel)}`
           + `&enhance=${this.config.enhance}`
           + `&nologo=true`
           + `&seed=${seed}`
-          + `&key=${encodeURIComponent(this.config.pollinationsKey)}`;
-          + `&width=${this.config.width}`;
-          + `&height=${this.config.height}`;
+          + `&width=${width}`
+          + `&height=${height}`;
       }
 
       this.imageUrl = isVideo ? null : mediaUrl;
@@ -174,6 +196,7 @@ Module.register("MMM-AIWallpaper", {
         imagemodel: this.config.imagemodel,
         videomodel: this.config.videomodel,
         mediaType: this.config.mediaType,
+        requestedSize: `${width}x${height}`,
         seed,
         mediaUrl,
         lastUpdated: new Date().toLocaleTimeString()
@@ -200,6 +223,8 @@ Module.register("MMM-AIWallpaper", {
     const bg = document.createElement("div");
     bg.className = "wallpaper-container";
 
+    const blur = Number(this.config.blur) || 0;
+
     if (this.localPath) {
       if (this.localMediaType === "video") {
         const video = document.createElement("video");
@@ -209,9 +234,17 @@ Module.register("MMM-AIWallpaper", {
         video.loop = this.config.loopVideo !== false;
         video.playsInline = true;
         video.src = this.localPath;
+        if (blur > 0) {
+          video.style.filter = `blur(${blur}px)`;
+          video.style.transform = "scale(1.1)";
+        }
         bg.appendChild(video);
       } else {
         bg.style.setProperty("background-image", "url('" + this.localPath + "')");
+        if (blur > 0) {
+          bg.style.filter = `blur(${blur}px)`;
+          bg.style.transform = "scale(1.1)";
+        }
       }
     }
 
@@ -236,6 +269,7 @@ Module.register("MMM-AIWallpaper", {
         ["MonthMod", info.monthMod || "—"],
         ["ImageModel", info.imagemodel || "—"],
         ["VideoModel", info.videomodel || "—"],
+        ["Requested size", info.requestedSize || "—"],
         ["Seed", info.seed || "—"],
         ["Updated", info.lastUpdated || "—"],
         ["Prompt", info.prompt || "—"]
